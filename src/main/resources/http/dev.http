@@ -1,0 +1,93 @@
+### A simple get request to the test endpoint. No need for login
+GET {{url}}/auth/test/
+
+### Populate the database with trips and guides
+POST {{url}}/trips/populate
+
+### Create a new user - this one will only get a USER role by default
+POST {{url}}/auth/register/
+
+{
+    "username": "user",
+    "password": "test123"
+}
+
+###
+POST {{url}}/auth/login/
+
+{
+    "username": "user",
+    "password": "test123"
+}
+
+> {%
+    client.global.set("jwt_token", response.body.token);
+    client.log("JWT Token: " + client.global.get("jwt_token"));
+%}
+
+### Add admin role to user
+POST {{url}}/auth/user/addrole/
+Accept: application/json
+Authorization: Bearer {{jwt_token}}
+
+{
+    "role": "admin"
+}
+
+
+### Get all trips
+GET {{url}}/trips
+Accept: application/json
+
+### Get a trip by ID
+GET {{url}}/trips/1
+Accept: application/json
+Authorization: Bearer {{jwt_token}}
+
+### Create a new trip (guide will be added later)
+POST {{url}}/trips
+Content-Type: application/json
+Authorization: Bearer {{jwt_token}}
+
+{
+  "starttime": "2024-06-01T09:00:00",
+  "endtime": "2024-06-01T17:00:00",
+  "startposition": "Mountain Base",
+  "name": "Mountain Adventure",
+  "price": 150.0,
+  "category": "SNOW"
+}
+
+### Update a trip by ID
+PUT {{url}}/trips/1
+Content-Type: application/json
+Authorization: Bearer {{jwt_token}}
+
+{
+  "starttime": "2024-07-01T09:00:00",
+  "endtime": "2024-07-01T17:00:00",
+  "startposition": "Updated Location",
+  "name": "Updated Adventure",
+  "price": 200.0,
+  "category": "ADVENTURE"
+}
+
+### Delete a trip by ID
+DELETE {{url}}/trips/1
+Authorization: Bearer {{jwt_token}}
+
+### Add an existing guide to an existing trip
+PUT {{url}}/trips/2/guides/2
+Authorization: Bearer {{jwt_token}}
+
+### Get trips by category
+GET {{url}}/trips/category/beach
+Authorization: Bearer {{jwt_token}}
+
+### Get overview of guide prices
+GET {{url}}/trips/guides/overview
+Authorization: Bearer {{jwt_token}}
+
+### Get the total pack weight for a trip
+GET {{url}}/trips/1/packweight
+Authorization: Bearer {{jwt_token}}
