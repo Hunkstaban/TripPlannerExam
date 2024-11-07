@@ -7,12 +7,11 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import dat.config.HibernateConfig;
 import dat.config.Populator;
 import dat.daos.TripDAO;
-import dat.dtos.GuidePriceDTO;
-import dat.dtos.PackingItemDTO;
-import dat.dtos.TripDTO;
+import dat.dtos.*;
 import dat.entities.Category;
 import dat.entities.Trip;
 import dat.exceptions.ErrorResponse;
+import dat.services.PackingItemService;
 import io.javalin.http.Context;
 import io.javalin.http.NotFoundResponse;
 import jakarta.persistence.EntityManagerFactory;
@@ -29,6 +28,7 @@ public class TripController {
 
     private final TripDAO tripDAO;
     private final Populator populator;
+    private static PackingItemService packingItemService = new PackingItemService();
 
     public TripController() {
         EntityManagerFactory emf = HibernateConfig.getEntityManagerFactory(false);
@@ -61,9 +61,10 @@ public class TripController {
             TripDTO trip = tripDAO.getById(id);
 
             if (trip != null) {
-                List<PackingItemDTO> packingItems = fetchPackingItems(trip.getCategory());
-                trip.setPackingItems(packingItems);
-                ctx.json(trip);
+                GuideDTO guide = trip.getGuide();
+                List<PackingItemDTO> packingItems = packingItemService.fetchPackingItems(trip.getCategory());
+                TripInfoDTO tripInfo = new TripInfoDTO(trip, guide, packingItems);
+                ctx.json(tripInfo);
             } else {
                 ctx.status(404).json(new ErrorResponse(404, "Trip not found"));
             }
@@ -131,22 +132,13 @@ public class TripController {
         }
     }
 
-    public void getGuidePriceOverview(Context ctx) {
-        try {
-            List<GuidePriceDTO> overview = tripDAO.getGuidePriceOverview();
-            ctx.json(overview);
-        } catch (Exception e) {
-            ctx.status(500).json(new ErrorResponse(500, "Failed to retrieve guide trip overviews"));
-        }
-    }
-
     public void getTotalPackingWeight(Context ctx) {
         try {
             int id = Integer.parseInt(ctx.pathParam("id"));
             TripDTO trip = tripDAO.getById(id);
 
             if (trip != null) {
-                List<PackingItemDTO> packingItems = fetchPackingItems(trip.getCategory());
+                List<PackingItemDTO> packingItems = packingItemService.fetchPackingItems(trip.getCategory());
                 int totalWeight = packingItems.stream().mapToInt(PackingItemDTO::getWeightInGrams).sum();
                 ctx.json(Map.of("tripId", id, "totalPackingWeightInGrams", totalWeight));
             } else {
@@ -154,42 +146,6 @@ public class TripController {
             }
         } catch (Exception e) {
             ctx.status(500).json(new ErrorResponse(500, "Failed to retrieve total packing weight"));
-        }
-    }
-
-    public List<PackingItemDTO> fetchPackingItems(Category category) {
-        try {
-            HttpClient client = HttpClient.newHttpClient();
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(new URI("https://packingapi.cphbusinessapps.dk/packinglist/" + category.toString().toLowerCase()))
-                    .GET()
-                    .build();
-
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-
-            if (response.statusCode() == 200) {
-                ObjectMapper objectMapper = new ObjectMapper();
-                objectMapper.registerModule(new JavaTimeModule());
-                objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-
-                PackingItemResponse packingItemResponse = objectMapper.readValue(response.body(), PackingItemResponse.class);
-                return packingItemResponse.getItems();
-            } else {
-                System.out.println("GET request failed. Status code: " + response.statusCode());
-            }
-        } catch (Exception e) {
-            e.printStackTrace(); // Print stack trace for debugging
-        }
-        return List.of();
-    }
-
-    // Private inner class to handle the external API response
-    private static class PackingItemResponse {
-        @JsonProperty("items")
-        private List<PackingItemDTO> items;
-
-        public List<PackingItemDTO> getItems() {
-            return items;
         }
     }
 }

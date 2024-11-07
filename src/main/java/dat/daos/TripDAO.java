@@ -131,23 +131,4 @@ public class TripDAO implements IDAO<TripDTO>, ITripGuideDAO {
             return trips.stream().map(TripDTO::new).toList();
         }
     }
-
-    public List<GuidePriceDTO> getGuidePriceOverview() {
-        try (EntityManager em = emf.createEntityManager()) {
-            List<Trip> allTrips = em.createQuery("SELECT t FROM Trip t", Trip.class).getResultList();
-
-            // Group trips by guide and calculate total price per guide
-            Map<Integer, Double> guideTotalPrices = allTrips.stream()
-                    .filter(trip -> trip.getGuide() != null) // Ensure trip has an associated guide
-                    .collect(Collectors.groupingBy(
-                            trip -> trip.getGuide().getId(),
-                            Collectors.summingDouble(Trip::getPrice)
-                    ));
-
-            // Convert to GuideTripOverviewDTO list
-            return guideTotalPrices.entrySet().stream()
-                    .map(entry -> new GuidePriceDTO(entry.getKey(), entry.getValue()))
-                    .collect(Collectors.toList());
-        }
-    }
 }

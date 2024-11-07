@@ -69,11 +69,11 @@ Authorization: Bearer {{jwt_token}}
   "startposition": "Updated Location",
   "name": "Updated Adventure",
   "price": 200.0,
-  "category": "ADVENTURE"
+  "category": "BEACH"
 }
 
 ### Delete a trip by ID
-DELETE {{url}}/trips/1
+DELETE {{url}}/trips/5
 Authorization: Bearer {{jwt_token}}
 
 ### Add an existing guide to an existing trip
@@ -89,5 +89,5 @@ GET {{url}}/trips/guides/overview
 Authorization: Bearer {{jwt_token}}
 
 ### Get the total pack weight for a trip
-GET {{url}}/trips/1/packweight
+GET {{url}}/trips/3/packweight
 Authorization: Bearer {{jwt_token}}

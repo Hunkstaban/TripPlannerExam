@@ -1,6 +1,7 @@
 package dat.dtos;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import dat.entities.Category;
 import dat.entities.Trip;
@@ -26,8 +27,8 @@ public class TripDTO {
     private Double price;
     private Category category;
 
+    @JsonIgnore
     private GuideDTO guide;
-    private List<PackingItemDTO> packingItems;
 
     public TripDTO (Trip trip) {
         this.id = trip.getId();

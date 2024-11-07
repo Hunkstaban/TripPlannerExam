@@ -1,5 +1,6 @@
 package dat.routes;
 
+import dat.controllers.GuideController;
 import dat.controllers.TripController;
 import dat.security.enums.Role;
 import io.javalin.apibuilder.EndpointGroup;
@@ -8,6 +9,7 @@ import static io.javalin.apibuilder.ApiBuilder.*;
 public class TripRoutes {
 
     private final TripController tripController = new TripController();
+    private final GuideController guideController = new GuideController();
 
     public EndpointGroup getRoutes() {
         return () -> {
@@ -19,9 +21,8 @@ public class TripRoutes {
             put("/{tripId}/guides/{guideId}", tripController::addGuideToTrip, Role.ADMIN); // Add an existing guide to an existing trip
             post("/populate", tripController::populateDatabase, Role.ANYONE); // Populate the database with trips and guides
             get("/category/{category}", tripController::filterTripsByCategory, Role.USER); // Filter trips by category
-            get("/guides/overview", tripController::getGuidePriceOverview, Role.USER); // Guide trip overview
+            get("/guides/overview", guideController::getGuidePriceOverview, Role.USER); // Guide trip overview
             get("/{id}/packweight", tripController::getTotalPackingWeight, Role.USER); // Total packing weight endpoint
-
         };
     }
 
