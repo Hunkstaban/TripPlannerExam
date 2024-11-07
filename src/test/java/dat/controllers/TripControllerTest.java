@@ -5,6 +5,7 @@ import dat.config.ApplicationConfig;
 import dat.config.HibernateConfig;
 import dat.daos.TripDAO;
 import dat.dtos.TripDTO;
+import dat.dtos.TripInfoDTO;
 import dat.entities.Guide;
 import dat.entities.Trip;
 import dat.entities.Category;
@@ -101,17 +102,17 @@ class TripControllerTest {
 
     @Test
     void getTripById() {
-        TripDTO trip = given()
+        TripInfoDTO tripInfo = given()
                 .when()
                 .get("/trips/" + trip1.getId())
                 .then()
                 .statusCode(200)
                 .extract()
-                .as(TripDTO.class);
+                .as(TripInfoDTO.class);
 
-        assertThat(trip.getId(), is(trip1.getId()));
-        assertThat(trip.getName(), is("Mountain Adventure"));
-        assertThat(trip.getPackingItems(), is(notNullValue())); // Verifying packing items are returned
+        assertThat(tripInfo.getTrip().getId(), is(trip1.getId()));
+        assertThat(tripInfo.getTrip().getName(), is("Mountain Adventure"));
+        assertThat(tripInfo.getPackingItems(), is(notNullValue())); // Verifying packing items are returned
     }
 
     @Test
@@ -121,7 +122,7 @@ class TripControllerTest {
                 .get("/trips/999")
                 .then()
                 .statusCode(404)
-                .body("message", containsString("Trip not found"));
+                .body("message", containsString("Trip with id 999 not found"));
     }
 
     @Test

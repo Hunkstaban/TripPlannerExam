@@ -50,6 +50,4 @@ public class Trip {
         this.price = tripDTO.getPrice();
         this.category = tripDTO.getCategory();
     }
-
-
 }

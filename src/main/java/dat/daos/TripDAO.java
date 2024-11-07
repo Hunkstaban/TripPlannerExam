@@ -8,6 +8,7 @@ import dat.entities.Guide;
 import dat.entities.Trip;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.persistence.TypedQuery;
 
 import java.util.HashSet;
@@ -44,8 +45,7 @@ public class TripDAO implements IDAO<TripDTO>, ITripGuideDAO {
     public List<TripDTO> getAll() {
         try (EntityManager em = emf.createEntityManager()) {
             TypedQuery<Trip> query = em.createQuery("SELECT t FROM Trip t", Trip.class);
-            List<TripDTO> tripDTOS = query.getResultList().stream().map(TripDTO::new).toList();
-            return tripDTOS;
+            return query.getResultList().stream().map(TripDTO::new).toList();
         }
     }
 
@@ -53,26 +53,30 @@ public class TripDAO implements IDAO<TripDTO>, ITripGuideDAO {
     public TripDTO getById(Integer id) {
         try (EntityManager em = emf.createEntityManager()) {
             Trip trip = em.find(Trip.class, id);
-            return trip != null ? new TripDTO(trip) : null;
+            if (trip == null) {
+                throw new EntityNotFoundException("Trip with id " + id + " not found");
+            }
+            return new TripDTO(trip);
         }
     }
 
     @Override
     public TripDTO update(Integer id, TripDTO dto) {
-        try (var em = emf.createEntityManager()) {
+        try (EntityManager em = emf.createEntityManager()) {
             em.getTransaction().begin();
             Trip trip = em.find(Trip.class, id);
-            if (trip != null) {
-                trip.setStarttime(dto.getStarttime());
-                trip.setEndtime(dto.getEndtime());
-                trip.setStartposition(dto.getStartposition());
-                trip.setName(dto.getName());
-                trip.setPrice(dto.getPrice());
-                trip.setCategory(dto.getCategory());
-
-                em.merge(trip);
-                em.getTransaction().commit();
+            if (trip == null) {
+                throw new EntityNotFoundException("Trip with id " + id + " not found");
             }
+            trip.setStarttime(dto.getStarttime());
+            trip.setEndtime(dto.getEndtime());
+            trip.setStartposition(dto.getStartposition());
+            trip.setName(dto.getName());
+            trip.setPrice(dto.getPrice());
+            trip.setCategory(dto.getCategory());
+
+            em.merge(trip);
+            em.getTransaction().commit();
             return new TripDTO(trip);
         }
     }
@@ -81,13 +85,13 @@ public class TripDAO implements IDAO<TripDTO>, ITripGuideDAO {
     public boolean delete(Integer id) {
         try (EntityManager em = emf.createEntityManager()) {
             Trip trip = em.find(Trip.class, id);
-            if (trip != null) {
-                em.getTransaction().begin();
-                em.remove(trip);
-                em.getTransaction().commit();
-                return true;
+            if (trip == null) {
+                return false;
             }
-            return false;
+            em.getTransaction().begin();
+            em.remove(trip);
+            em.getTransaction().commit();
+            return true;
         }
     }
 
@@ -98,10 +102,15 @@ public class TripDAO implements IDAO<TripDTO>, ITripGuideDAO {
             Trip trip = em.find(Trip.class, tripId);
             Guide guide = em.find(Guide.class, guideId);
 
-            if (trip != null && guide != null) {
-                guide.getTrips().add(trip); // Add trip to the guide's trips
-                trip.setGuide(guide);       // Set guide in the trip
+            if (trip == null) {
+                throw new EntityNotFoundException("Trip with id " + tripId + " not found");
             }
+            if (guide == null) {
+                throw new EntityNotFoundException("Guide with id " + guideId + " not found");
+            }
+
+            guide.getTrips().add(trip);
+            trip.setGuide(guide);
 
             em.getTransaction().commit();
         }
@@ -124,11 +133,12 @@ public class TripDAO implements IDAO<TripDTO>, ITripGuideDAO {
 
     public List<TripDTO> getTripsByCategory(Category category) {
         try (EntityManager em = emf.createEntityManager()) {
-            String query = "SELECT t FROM Trip t WHERE t.category = :category";
-            List<Trip> trips = em.createQuery(query, Trip.class)
-                    .setParameter("category", category)
-                    .getResultList();
-            return trips.stream().map(TripDTO::new).toList();
+            TypedQuery<Trip> query = em.createQuery("SELECT t FROM Trip t WHERE t.category = :category", Trip.class);
+            query.setParameter("category", category);
+            return query.getResultList().stream().map(TripDTO::new).toList();
         }
     }
 }
+
+
+

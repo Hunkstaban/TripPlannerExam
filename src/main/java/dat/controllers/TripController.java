@@ -1,26 +1,21 @@
 package dat.controllers;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.databind.JsonMappingException;
+
 import dat.config.HibernateConfig;
 import dat.config.Populator;
 import dat.daos.TripDAO;
 import dat.dtos.*;
 import dat.entities.Category;
-import dat.entities.Trip;
 import dat.exceptions.ErrorResponse;
 import dat.services.PackingItemService;
 import io.javalin.http.Context;
-import io.javalin.http.NotFoundResponse;
-import jakarta.persistence.EntityManagerFactory;
 
-import java.net.URI;
-import java.net.URL;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
+import jakarta.persistence.EntityManagerFactory;
+import jakarta.persistence.EntityNotFoundException;
+
 import java.util.List;
 import java.util.Map;
 
@@ -36,13 +31,17 @@ public class TripController {
         this.populator = Populator.getInstance(emf);
     }
 
+    private void respondWithError(Context ctx, int status, String message) {
+        ctx.status(status).json(new ErrorResponse(status, message));
+    }
+
     public void createTrip(Context ctx) {
         try {
             TripDTO tripDTO = ctx.bodyAsClass(TripDTO.class);
             TripDTO createdTrip = tripDAO.create(tripDTO);
             ctx.status(201).json(createdTrip);
-        } catch (Exception e) {
-            ctx.status(500).json(new ErrorResponse(500, "Failed to create trip"));
+        }  catch (Exception e) {
+            respondWithError(ctx, 500, "Failed to create trip: " + e.getMessage());
         }
     }
 
@@ -51,7 +50,7 @@ public class TripController {
             List<TripDTO> trips = tripDAO.getAll();
             ctx.json(trips);
         } catch (Exception e) {
-            ctx.status(500).json(new ErrorResponse(500, "Failed to retrieve trips"));
+            respondWithError(ctx, 500, "Failed to retrieve trips: " + e.getMessage());
         }
     }
 
@@ -60,16 +59,17 @@ public class TripController {
             int id = Integer.parseInt(ctx.pathParam("id"));
             TripDTO trip = tripDAO.getById(id);
 
-            if (trip != null) {
-                GuideDTO guide = trip.getGuide();
-                List<PackingItemDTO> packingItems = packingItemService.fetchPackingItems(trip.getCategory());
-                TripInfoDTO tripInfo = new TripInfoDTO(trip, guide, packingItems);
-                ctx.json(tripInfo);
-            } else {
-                ctx.status(404).json(new ErrorResponse(404, "Trip not found"));
-            }
+            GuideDTO guide = trip.getGuide();
+            List<PackingItemDTO> packingItems = packingItemService.fetchPackingItems(trip.getCategory());
+            TripInfoDTO tripInfo = new TripInfoDTO(trip, guide, packingItems);
+            ctx.json(tripInfo);
+
+        } catch (NumberFormatException e) {
+            respondWithError(ctx, 400, "Invalid trip ID format");
+        } catch (EntityNotFoundException e) {
+            respondWithError(ctx, 404, e.getMessage());
         } catch (Exception e) {
-            ctx.status(500).json(new ErrorResponse(500, "Failed to retrieve trip"));
+            respondWithError(ctx, 500, "Failed to retrieve trip: " + e.getMessage());
         }
     }
 
@@ -79,8 +79,12 @@ public class TripController {
             TripDTO updatedTrip = ctx.bodyAsClass(TripDTO.class);
             TripDTO tripDTO = tripDAO.update(id, updatedTrip);
             ctx.status(200).json(tripDTO);
+        } catch (NumberFormatException e) {
+            respondWithError(ctx, 400, "Invalid trip ID");
+        } catch (EntityNotFoundException e) {
+            respondWithError(ctx, 404, e.getMessage());
         } catch (Exception e) {
-            ctx.status(500).json(new ErrorResponse(500, "Failed to update trip"));
+            respondWithError(ctx, 500, "Failed to update trip: " + e.getMessage());
         }
     }
 
@@ -91,10 +95,12 @@ public class TripController {
             if (isDeleted) {
                 ctx.status(200).result("Trip with id " + id + " deleted");
             } else {
-                ctx.status(404).json(new ErrorResponse(404, "Trip not found"));
+                respondWithError(ctx, 404, "Trip not found");
             }
+        } catch (NumberFormatException e) {
+            respondWithError(ctx, 400, "Invalid trip ID");
         } catch (Exception e) {
-            ctx.status(500).json(new ErrorResponse(500, "Failed to delete trip"));
+            respondWithError(ctx, 500, "Failed to delete trip: " + e.getMessage());
         }
     }
 
@@ -104,8 +110,12 @@ public class TripController {
             int guideId = Integer.parseInt(ctx.pathParam("guideId"));
             tripDAO.addGuideToTrip(tripId, guideId);
             ctx.status(200).result("Guide with ID " + guideId + " has been added to Trip with ID " + tripId);
+        } catch (NumberFormatException e) {
+            respondWithError(ctx, 400, "Invalid ID format for trip or guide");
+        } catch (EntityNotFoundException e) {
+            respondWithError(ctx, 404, e.getMessage());
         } catch (Exception e) {
-            ctx.status(500).json(new ErrorResponse(500, "Failed to add guide to trip"));
+            respondWithError(ctx, 500, "Failed to add guide to trip: " + e.getMessage());
         }
     }
 
@@ -114,38 +124,39 @@ public class TripController {
             populator.populate();
             ctx.status(201).result("Database populated with sample data.");
         } catch (Exception e) {
-            ctx.status(500).json(new ErrorResponse(500, "Failed to populate database"));
+            respondWithError(ctx, 500, "Failed to populate database: " + e.getMessage());
         }
     }
 
     public void filterTripsByCategory(Context ctx) {
         try {
             String categoryParam = ctx.pathParam("category").toUpperCase();
-            Category category = Category.valueOf(categoryParam.toUpperCase());
+            Category category = Category.valueOf(categoryParam);
 
             List<TripDTO> trips = tripDAO.getTripsByCategory(category);
             ctx.json(trips);
         } catch (IllegalArgumentException e) {
-            ctx.status(400).json(new ErrorResponse(400, "Invalid category specified"));
+            respondWithError(ctx, 400, "Invalid category specified");
         } catch (Exception e) {
-            ctx.status(500).json(new ErrorResponse(500, "Failed to filter trips by category"));
+            respondWithError(ctx, 500, "Failed to filter trips by category: " + e.getMessage());
         }
     }
 
     public void getTotalPackingWeight(Context ctx) {
         try {
             int id = Integer.parseInt(ctx.pathParam("id"));
-            TripDTO trip = tripDAO.getById(id);
+            TripDTO trip = tripDAO.getById(id); // Will throw EntityNotFoundException if not found
 
-            if (trip != null) {
-                List<PackingItemDTO> packingItems = packingItemService.fetchPackingItems(trip.getCategory());
-                int totalWeight = packingItems.stream().mapToInt(PackingItemDTO::getWeightInGrams).sum();
-                ctx.json(Map.of("tripId", id, "totalPackingWeightInGrams", totalWeight));
-            } else {
-                ctx.status(404).json(new ErrorResponse(404, "Trip not found"));
-            }
+            List<PackingItemDTO> packingItems = packingItemService.fetchPackingItems(trip.getCategory());
+            int totalWeight = packingItems.stream().mapToInt(PackingItemDTO::getWeightInGrams).sum();
+            ctx.json(Map.of("tripId", id, "totalPackingWeightInGrams", totalWeight));
+
+        } catch (NumberFormatException e) {
+            respondWithError(ctx, 400, "Invalid trip ID");
+        } catch (EntityNotFoundException e) {
+            respondWithError(ctx, 404, e.getMessage()); // Handles case where trip is not found
         } catch (Exception e) {
-            ctx.status(500).json(new ErrorResponse(500, "Failed to retrieve total packing weight"));
+            respondWithError(ctx, 500, "Failed to retrieve total packing weight: " + e.getMessage());
         }
     }
 }

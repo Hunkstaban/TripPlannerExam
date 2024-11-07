@@ -69,7 +69,7 @@ Authorization: Bearer {{jwt_token}}
   "startposition": "Updated Location",
   "name": "Updated Adventure",
   "price": 200.0,
-  "category": "BEACH"
+  "category": "FOREST"
 }
 
 ### Delete a trip by ID
