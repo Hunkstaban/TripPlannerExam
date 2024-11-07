@@ -11,7 +11,7 @@ public class TripRoutes {
     private final TripController tripController = new TripController();
     private final GuideController guideController = new GuideController();
 
-    public EndpointGroup getRoutes() {
+    /*public EndpointGroup getRoutes() {
         return () -> {
             get("/", tripController::getAllTrips, Role.ANYONE); // Get all trips
             get("/{id}", tripController::getTripById, Role.USER); // Get a trip by ID
@@ -24,9 +24,9 @@ public class TripRoutes {
             get("/guides/overview", guideController::getGuidePriceOverview, Role.USER); // Guide trip overview
             get("/{id}/packweight", tripController::getTotalPackingWeight, Role.USER); // Total packing weight endpoint
         };
-    }
+    }*/
 
-    /*// To test without roles:
+    // To test without roles:
     public EndpointGroup getRoutes() {
         return () -> {
             get("/", tripController::getAllTrips); // Get all trips
@@ -37,8 +37,8 @@ public class TripRoutes {
             put("/{tripId}/guides/{guideId}", tripController::addGuideToTrip); // Add an existing guide to an existing trip
             post("/populate", tripController::populateDatabase); // Populate the database with trips and guides
             get("/category/{category}", tripController::filterTripsByCategory); // Filter trips by category
-            get("/guides/overview", tripController::getGuidePriceOverview); // Guide trip overview
+            get("/guides/overview", guideController::getGuidePriceOverview); // Guide trip overview
             get("/{id}/packweight", tripController::getTotalPackingWeight); // Total packing weight endpoint
         };
-    }*/
+    }
 }
