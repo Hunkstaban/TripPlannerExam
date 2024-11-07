@@ -2014,3 +2014,5 @@ Caused by: java.net.ConnectException: Connection refused
 2024-11-07 20:46:53 [main] INFO  io.javalin.Javalin - You are running Javalin 6.3.0 (released August 22, 2024).
 2024-11-07 20:47:00 [JettyServerThreadPool-24] INFO  dat.config.ApplicationConfig -  Request 1 - POST /api/v1/auth/register/ was handled with status code 201 Created
 2024-11-07 20:47:02 [JettyServerThreadPool-25] INFO  dat.config.ApplicationConfig -  Request 2 - POST /api/v1/auth/login/ was handled with status code 200 OK
+2024-11-07 20:55:11 [JettyServerThreadPool-32] INFO  dat.config.ApplicationConfig -  Request 3 - GET /api/v1/trips/category/beach was handled with status code 200 OK
+2024-11-07 21:05:05 [JettyServerThreadPool-26] INFO  dat.config.ApplicationConfig -  Request 4 - POST /api/v1/auth/login/ was handled with status code 200 OK

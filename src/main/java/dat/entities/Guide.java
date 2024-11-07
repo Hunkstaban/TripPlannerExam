@@ -24,7 +24,7 @@ public class Guide {
     private String phone;
     private int yearsOfExperience;
 
-    @OneToMany(mappedBy = "guide", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "guide", cascade = CascadeType.PERSIST)
     private List<Trip> trips = new ArrayList<>();
 
     public Guide(String firstname, String lastname, String email, String phone, int yearsOfExperience) {
