@@ -58,7 +58,7 @@ Authorization: Bearer {{jwt_token}}
   "category": "SNOW"
 }
 
-### Update a trip by ID
+### Update a trip by ID (ADMIN)
 PUT {{url}}/trips/1
 Content-Type: application/json
 Authorization: Bearer {{jwt_token}}
@@ -72,11 +72,11 @@ Authorization: Bearer {{jwt_token}}
   "category": "FOREST"
 }
 
-### Delete a trip by ID
+### Delete a trip by ID (ADMIN)
 DELETE {{url}}/trips/5
 Authorization: Bearer {{jwt_token}}
 
-### Add an existing guide to an existing trip
+### Add an existing guide to an existing trip (ADMIN)
 PUT {{url}}/trips/2/guides/2
 Authorization: Bearer {{jwt_token}}
 
