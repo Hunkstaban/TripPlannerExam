@@ -1,15 +1,17 @@
 package dat.controllers;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import dat.Utils.Populator;
 import dat.config.ApplicationConfig;
 import dat.config.HibernateConfig;
-import dat.daos.TripDAO;
 import dat.dtos.TripDTO;
 import dat.dtos.TripInfoDTO;
 import dat.entities.Guide;
 import dat.entities.Trip;
 import dat.entities.Category;
-import dat.routes.TripRoutes;
+import dat.security.controllers.SecurityController;
+import dat.security.daos.SecurityDAO;
+import dat.security.dtos.UserDTO;
+import dat.security.exceptions.ValidationException;
 import io.javalin.Javalin;
 import io.restassured.RestAssured;
 import io.restassured.common.mapper.TypeRef;
@@ -28,40 +30,42 @@ class TripControllerTest {
 
     private static EntityManagerFactory emf;
     private static Javalin app;
-    private static Trip trip1, trip2;
-    private static Guide guide1, guide2;
+    private static Trip[] trips;
+    private static Guide[] guides;
+    private static String userToken, adminToken;
+    private static final String BASE_URL = "http://localhost:7070/api/v1";
+    private static SecurityController securityController;
+    private static SecurityDAO securityDAO;
 
     @BeforeAll
     static void setUpAll() {
-        RestAssured.baseURI = "http://localhost:7070/api/v1";
-
-        // Test database and EntityManagerFactory
+        RestAssured.baseURI = BASE_URL;
         emf = HibernateConfig.getEntityManagerFactory(true);
-
-        // Initializing Javalin server
         app = ApplicationConfig.startServer(7070);
+
+        securityController = SecurityController.getInstance();
+        securityDAO = new SecurityDAO(emf);
+
+        // Populate users for authorization and get tokens
+        UserDTO[] users = Populator.populateUsers(emf);
+        UserDTO userDTO = users[0];
+        UserDTO adminDTO = users[1];
+
+        try {
+            UserDTO verifiedUser = securityDAO.getVerifiedUser(userDTO.getUsername(), userDTO.getPassword());
+            UserDTO verifiedAdmin = securityDAO.getVerifiedUser(adminDTO.getUsername(), adminDTO.getPassword());
+            userToken = "Bearer " + securityController.createToken(verifiedUser);
+            adminToken = "Bearer " + securityController.createToken(verifiedAdmin);
+        } catch (ValidationException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @BeforeEach
     void setUp() {
-        // Create test data: guides and trips
-        guide1 = new Guide("John", "Doe", "john.doe@example.com", "123456789", 10);
-        guide2 = new Guide("Jane", "Smith", "jane.smith@example.com", "987654321", 8);
-
-        trip1 = new Trip(LocalDateTime.of(2024, 6, 1, 9, 0),
-                LocalDateTime.of(2024, 6, 1, 17, 0), "Mountain Base", "Mountain Adventure", 150.0, Category.FOREST);
-
-        trip2 = new Trip(LocalDateTime.of(2024, 7, 10, 10, 0),
-                LocalDateTime.of(2024, 7, 10, 16, 0), "City Center", "City Exploration", 100.0, Category.CITY);
-
-        try (var em = emf.createEntityManager()) {
-            em.getTransaction().begin();
-            em.persist(guide1);
-            em.persist(guide2);
-            em.persist(trip1);
-            em.persist(trip2);
-            em.getTransaction().commit();
-        }
+        // Populate the database with guides and trips
+        guides = Populator.populateGuides(emf);
+        trips = Populator.populateTrips(emf, guides);
     }
 
     @AfterEach
@@ -81,14 +85,19 @@ class TripControllerTest {
     }
 
     @Test
-    @DisplayName("Test server is up")
     void testServerIsUp() {
-        given().when().get("/trips").then().statusCode(200);
+        given()
+                .header("Authorization", userToken)
+                .when()
+                .get("/trips")
+                .then()
+                .statusCode(200);
     }
 
     @Test
     void getAllTrips() {
         List<TripDTO> trips = given()
+                .header("Authorization", userToken)
                 .when()
                 .get("/trips")
                 .then()
@@ -103,21 +112,23 @@ class TripControllerTest {
     @Test
     void getTripById() {
         TripInfoDTO tripInfo = given()
+                .header("Authorization", userToken)
                 .when()
-                .get("/trips/" + trip1.getId())
+                .get("/trips/" + trips[0].getId())
                 .then()
                 .statusCode(200)
                 .extract()
                 .as(TripInfoDTO.class);
 
-        assertThat(tripInfo.getTrip().getId(), is(trip1.getId()));
+        assertThat(tripInfo.getTrip().getId(), is(trips[0].getId()));
         assertThat(tripInfo.getTrip().getName(), is("Mountain Adventure"));
-        assertThat(tripInfo.getPackingItems(), is(notNullValue())); // Verifying packing items are returned
+        assertThat(tripInfo.getPackingItems(), is(notNullValue()));
     }
 
     @Test
     void getTripById_NotFound() {
         given()
+                .header("Authorization", userToken)
                 .when()
                 .get("/trips/999")
                 .then()
@@ -131,6 +142,7 @@ class TripControllerTest {
                 LocalDateTime.of(2024, 8, 20, 18, 0), "Lake Shore", "Lake Excursion", 120.0, Category.LAKE);
 
         TripDTO createdTrip = given()
+                .header("Authorization", userToken)
                 .body(newTrip)
                 .contentType("application/json")
                 .when()
@@ -144,10 +156,71 @@ class TripControllerTest {
     }
 
     @Test
+    void addTrip_Unauthorized() {
+        TripDTO newTrip = new TripDTO(LocalDateTime.of(2024, 8, 20, 10, 0),
+                LocalDateTime.of(2024, 8, 20, 18, 0), "Lake Shore", "Lake Excursion", 120.0, Category.LAKE);
+
+        given()
+                .body(newTrip)
+                .contentType("application/json")
+                .when()
+                .post("/trips")
+                .then()
+                .statusCode(401);
+    }
+
+    @Test
+    void updateTrip() {
+        TripDTO updatedTrip = new TripDTO(LocalDateTime.of(2024, 9, 15, 8, 0),
+                LocalDateTime.of(2024, 9, 15, 18, 0), "Beach Side", "Beach Adventure", 200.0, Category.BEACH);
+
+        TripDTO responseTrip = given()
+                .header("Authorization", adminToken)
+                .body(updatedTrip)
+                .contentType("application/json")
+                .when()
+                .put("/trips/" + trips[0].getId())
+                .then()
+                .statusCode(200)
+                .extract()
+                .as(TripDTO.class);
+
+        assertThat(responseTrip.getName(), is("Beach Adventure"));
+        assertThat(responseTrip.getCategory(), is(Category.BEACH));
+    }
+
+    @Test
+    void addGuideToTrip() {
+        given()
+                .header("Authorization", adminToken)
+                .when()
+                .put("/trips/" + trips[0].getId() + "/guides/" + guides[1].getId())
+                .then()
+                .statusCode(200)
+                .body(containsString("Guide with ID " + guides[1].getId() + " has been added to Trip with ID " + trips[0].getId()));
+    }
+
+    @Test
+    void filterTripsByCategory() {
+        List<TripDTO> filteredTrips = given()
+                .header("Authorization", userToken)
+                .when()
+                .get("/trips/category/" + Category.FOREST.name())
+                .then()
+                .statusCode(200)
+                .extract()
+                .as(new TypeRef<List<TripDTO>>() {});
+
+        assertThat(filteredTrips, is(not(empty())));
+        assertThat(filteredTrips.get(0).getCategory(), is(Category.FOREST));
+    }
+
+    @Test
     void getTotalPackingWeight() {
         int totalWeight = given()
+                .header("Authorization", userToken)
                 .when()
-                .get("/trips/" + trip1.getId() + "/packweight")
+                .get("/trips/" + trips[0].getId() + "/packweight")
                 .then()
                 .statusCode(200)
                 .extract()
@@ -159,16 +232,18 @@ class TripControllerTest {
     @Test
     void deleteTrip() {
         given()
+                .header("Authorization", adminToken)
                 .when()
-                .delete("/trips/" + trip1.getId())
+                .delete("/trips/" + trips[0].getId())
                 .then()
                 .statusCode(200)
-                .body(containsString("Trip with id " + trip1.getId() + " deleted"));
+                .body(containsString("Trip with id " + trips[0].getId() + " deleted"));
     }
 
     @Test
     void deleteTrip_NotFound() {
         given()
+                .header("Authorization", adminToken)
                 .when()
                 .delete("/trips/999")
                 .then()
